@@ -1,107 +1,135 @@
-// Function to replace specific words in text nodes
-function replaceTextNode(node) {
-    // Only replace text that contains these words
-    if (node.nodeType === 3) {  // Text node
-        let text = node.nodeValue;
+const replaceMappingSwear = [
+    ["fuck", "fluff"],
+    ["fukc", "fluff"],
+    ["bullshit", "dirt"],
+    ["shit", "dirt"],
+    ["cunt", "pal"],
+    ["bitches", "puppies"],
+    ["bitch", "puppy"],
+    ["faggot", "floret"],
+    ["fag", "flort"],
+    ["retard", "floret"],
+    ["trannies", "florets"],
+    ["tranny", "floret"],
+    ["\\b(troon)", "floret"],
+];
+const replaceMappingFull = [
+    ["nazism", "feralism"],
+    ["nazi", "feralist"],
+    ["capitalis", "feralis"],
+    ["fascis", "feralis"],
+    ["porn", "florn"],
+    ["sex", "s*x"],
+    ["cock,", "c*ck"],
+    ["dick,", "d*ck"],
+    ["\\b(drug)", "xenodrug"],
+    ["\\b(hate)", "dislike"],
+    ["\\b(kill)", "end"],
+    ["stupid", "silly"],
+    ["\\b(idiots)\\b", "dummies"],
+    ["\\b(idiot)\\b", "dummy"],
+    ["\\b(died)\\b", "wilted"],
+    ["\\b(dead)\\b", "wilted"],
+    ["\\b(dies)\\b", "wilts"],
+    ["\\b(dying)\\b", "wilting"],
+    ["person", "sophont"],
+    ["\\b(bastard)\\b", "meanie"],
+    ["\\b(bastards)\\b", "meanies"],
+    ["\\b(die)\\b", "wilt"],
+];
 
-        // Function to match and replace word while preserving case
-        const replaceWithCase = (word, replacement) => {
-            return word.replace(/(\b\w+\b)/gi, (match) => {
-                if (match === match.toUpperCase()) {
-                    return replacement.toUpperCase();
-                } else if (match === match.charAt(0).toUpperCase() + match.slice(1).toLowerCase()) {
-                    return replacement.charAt(0).toUpperCase() + replacement.slice(1).toLowerCase();
-                }
-                return replacement.toLowerCase();
-            });
-        };
-
-        // Get current filter settings
-        chrome.storage.sync.get(['filters'], (data) => {
-            const filters = data.filters || {};
-            
-            if (filters.swear || filters.full) {
-                // Replace swear words
-                text = text.replace(/fuck/gi, (match) => replaceWithCase(match, "fluff"))
-                            .replace(/fukc/gi, (match) => replaceWithCase(match, "fluff"))
-                            .replace(/bullshit/gi, (match) => replaceWithCase(match, "dirt"))
-                            .replace(/shit/gi, (match) => replaceWithCase(match, "dirt"))
-                            .replace(/cunt/gi, (match) => replaceWithCase(match, "pal"))
-                            .replace(/bitches/gi, (match) => replaceWithCase(match, "puppies"))
-                            .replace(/bitch/gi, (match) => replaceWithCase(match, "puppy"))          
-                            .replace(/faggot/gi, (match) => replaceWithCase(match, "floret"))
-                            .replace(/fag/gi, (match) => replaceWithCase(match, "flort"))
-                            .replace(/retard/gi, (match) => replaceWithCase(match, "floret"))
-                            .replace(/trannies/gi, (match) => replaceWithCase(match, "florets"))
-                            .replace(/tranny/gi, (match) => replaceWithCase(match, "floret"))
-                            .replace(/\b(troon)/gi, (match) => replaceWithCase(match, "floret"));
-                           
-            }
-            
-            if (filters.full) {
-                // Replace other bad words
-                text = text.replace(/nazism/gi, (match) => replaceWithCase(match, "feralism"))
-                            .replace(/nazi/gi, (match) => replaceWithCase(match, "feralist"))
-                            .replace(/capitalis/gi, (match) => replaceWithCase(match, "feralis"))
-                            .replace(/fascis/gi, (match) => replaceWithCase(match, "feralis"))
-                            .replace(/porn/gi, (match) => replaceWithCase(match, "florn"))
-                            .replace(/sex/gi, (match) => replaceWithCase(match, "s*x"))
-                            .replace(/cock/gi, (match) => replaceWithCase(match, "c*ck"))
-                            .replace(/dick/gi, (match) => replaceWithCase(match, "d*ck"))
-                            .replace(/\b(drug)/gi, (match) => replaceWithCase(match, "xenodrug"))
-                            .replace(/\b(hate)/gi, (match) => replaceWithCase(match, "dislike"))
-                            .replace(/\b(kill)/gi, (match) => replaceWithCase(match, "end"))
-                            .replace(/stupid/gi, (match) => replaceWithCase(match, "silly"))
-                            .replace(/\b(idiots)\b/gi, (match) => replaceWithCase(match, "dummies"))
-                            .replace(/\b(idiot)\b/gi, (match) => replaceWithCase(match, "dummy"))
-                            .replace(/\b(died)\b/gi, (match) => replaceWithCase(match, "wilted"))
-                            .replace(/\b(dies)\b/gi, (match) => replaceWithCase(match, "wilts"))
-                            .replace(/\b(dying)\b/gi, (match) => replaceWithCase(match, "wilting"))
-                            .replace(/person/gi, (match) => replaceWithCase(match, "sophont"))
-                            .replace(/\b(bastard)\b/gi, (match) => replaceWithCase(match, "meanie"))
-                            .replace(/\b(bastards)\b/gi, (match) => replaceWithCase(match, "meanies"))
-                            .replace(/\b(die)\b/gi, (match) => replaceWithCase(match, "wilt"));
-            }
-
-            // Only update the text if changes were made
-            if (text !== node.nodeValue) {
-                node.nodeValue = text;
-            }
-
+const replacementBuilder = (mapping) => {
+    //if the mapping is empty, return a dummy method
+    if (mapping.length === 0) {
+        return (text) => ({
+            text, changed: false
         });
+    }
+    //clone mapping array to avoid modifying the base ones
+    mapping = JSON.parse(JSON.stringify(mapping));
+
+    regex = RegExp(mapping.map(map => map[0]). join('|'), 'gi');
+    mapping.forEach(map => map[0] = map[0].replace(/\\b|\(|\)/g, "").trim());
+    return (text) => {
+        let changed = false;
+        const replacedText = text.replaceAll(
+            regex,
+            (match) => {
+                changed = true;
+                return replaceWithCase(match, mapping.find(map => match.trim().toLowerCase() == map[0])[1]);
+            },
+        );
+        return { text: replacedText, changed }
     }
 }
 
-// Function to traverse the DOM and replace text
-function replaceText() {
+let replacer;
+
+const updateReplacer = (filters) => {
+    let mapping = [];
+    if (filters.swear || filters.full) {
+        mapping = [...replaceMappingSwear];
+    }
+    if (filters.full) {
+        mapping = [...mapping, ...replaceMappingFull];
+    }
+    replacer = replacementBuilder(mapping);
+}
+
+// Function to match and replace word while preserving case
+const replaceWithCase = (word, replacement) => {
+    return word.replace(/(\b\w+\b)/gi, (match) => {
+        if (match === match.toUpperCase()) {
+            return replacement.toUpperCase();
+        } else if (match === match.charAt(0).toUpperCase() + match.slice(1).toLowerCase()) {
+            return replacement.charAt(0).toUpperCase() + replacement.slice(1).toLowerCase();
+        }
+        return replacement.toLowerCase();
+    });
+};
+
+const replaceTextNode = (node) => {
+    if (node.nodeType === 3) { // Text node
+        const text = node.nodeValue;
+        const replacement = replacer(text);
+        if (replacement.changed) {
+            node.nodeValue = replacement.text;
+        }
+    }
+}
+
+const replaceFullText = () => {
     const walker = document.createTreeWalker(
-        document.body, 
-        NodeFilter.SHOW_TEXT, 
+        document.body,
+        NodeFilter.SHOW_TEXT,
         {
-            acceptNode: function(node) {
+            acceptNode: (node) => {
                 // Ignore text nodes in certain elements like links and buttons
                 const parent = node.parentNode;
-                if (parent && (parent.tagName === 'A' || parent.tagName === 'BUTTON' || parent.tagName === 'INPUT' || parent.tagName === 'TEXTAREA' || parent.isContentEditable)) {
+                if (parent && (['A', 'BUTTON', 'INPUT', 'TEXTAREA', 'SCRIPT'].includes(parent.tagName) || parent.isContentEditable)) {
                     return NodeFilter.FILTER_REJECT;
                 }
                 return NodeFilter.FILTER_ACCEPT;
             }
-        },
-        false
+        }
     );
-
     let currentNode;
     while (currentNode = walker.nextNode()) {
         replaceTextNode(currentNode);
     }
 }
 
-// Function to start polling every 2 seconds for new content
-function startPolling() {
-    setInterval(() => {
-        replaceText();  // Check for and replace text every 2 seconds
-    }, 500);  // Adjust the frequency as needed
-}
 
-// Start polling as soon as the script is loaded
-startPolling();
+// Start Execution
+chrome.storage.sync.get(['filters'], (data) => {
+    updateReplacer(data.filters || {});
+    setInterval(() => {
+        replaceFullText();
+    }, 500);
+});
+
+chrome.storage.onChanged.addListener((changes) => {
+    if (changes.filters && changes.filters.newValue) {
+        updateReplacer(changes.filters.newValue);
+    }
+});
